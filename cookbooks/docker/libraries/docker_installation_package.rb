@@ -143,12 +143,51 @@ module DockerCookbook
 
           package 'apt-transport-https'
 
-          apt_repository 'Docker' do
-            components Array(new_resource.repo_channel)
-            uri "https://download.docker.com/linux/#{node['platform']}"
-            arch deb_arch
-            key "https://download.docker.com/linux/#{node['platform']}/gpg"
-            action :add
+          # Debian 13 (trixie) removed `apt-key`; chef's apt_repository `key`
+          # attribute shells out to `apt-key add`, which fails on trixie. Use a
+          # dearmored keyring + signed-by there. Other releases keep the original.
+          if platform?('debian') && node['platform_version'].to_i >= 13
+            directory '/etc/apt/keyrings' do
+              owner 'root'
+              group 'root'
+              mode '0755'
+              recursive true
+            end
+
+            remote_file '/etc/apt/keyrings/docker.asc' do
+              source "https://download.docker.com/linux/#{node['platform']}/gpg"
+              owner 'root'
+              group 'root'
+              mode '0644'
+              retries 3
+              retry_delay 5
+            end
+
+            execute 'dearmor-docker-key' do
+              command 'gpg --batch --yes --dearmor -o /etc/apt/keyrings/docker.gpg /etc/apt/keyrings/docker.asc'
+              creates '/etc/apt/keyrings/docker.gpg'
+            end
+
+            codename = node['lsb']['codename']
+            file '/etc/apt/sources.list.d/docker.list' do
+              content "deb [arch=#{deb_arch} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/#{node['platform']} #{codename} #{new_resource.repo_channel}\n"
+              owner 'root'
+              group 'root'
+              mode '0644'
+              notifies :update, 'apt_update[docker_trixie]', :immediately
+            end
+
+            apt_update 'docker_trixie' do
+              action :nothing
+            end
+          else
+            apt_repository 'Docker' do
+              components Array(new_resource.repo_channel)
+              uri "https://download.docker.com/linux/#{node['platform']}"
+              arch deb_arch
+              key "https://download.docker.com/linux/#{node['platform']}/gpg"
+              action :add
+            end
           end
         else
           Chef::Log.warn("Cannot setup the Docker repo for platform #{node['platform']}. Skipping.")
