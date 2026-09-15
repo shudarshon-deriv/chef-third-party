@@ -50,6 +50,16 @@ module DockerCookbook
       false
     end
 
+    def bookworm?
+      return true if platform?('debian') && node['platform_version'].to_i == 12
+      false
+    end
+
+    def trixie?
+      return true if platform?('debian') && node['platform_version'].to_i == 13
+      false
+    end
+
     def bionic?
       return true if platform?('ubuntu') && node['platform_version'] == '18.04'
       false
@@ -69,6 +79,10 @@ module DockerCookbook
                    'buster'
                  elsif bullseye? # deb 11
                    'bullseye'
+                 elsif bookworm? # deb 12
+                   'bookworm'
+                 elsif trixie? # deb 13
+                   'trixie'
                  elsif bionic? # ubuntu 18.04
                    'bionic'
                  elsif focal? # ubuntu 20.04
