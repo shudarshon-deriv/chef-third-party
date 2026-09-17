@@ -92,6 +92,12 @@ module DockerCookbook
       # https://github.com/seemethere/docker-ce-packaging/blob/9ba8e36e8588ea75209d813558c8065844c953a0/deb/gen-deb-ver#L16-L20
       test_version = '3'
 
+      # Debian 13 (trixie): the docker-ce repo uses the modern revision scheme
+      # "5:<v>-1~debian.13~trixie" (not the legacy "5:<v>~3-0~debian-<codename>"),
+      # so the generic branch below would build a version string that matches no
+      # package and silently fall back to latest. Return the correct trixie form.
+      return "5:#{v}-1~debian.13~trixie" if trixie? && v.to_f >= 18.09
+
       if v.to_f < 18.06 && !bionic?
         return "#{v}~ce-0~debian" if debian?
         return "#{v}~ce-0~ubuntu" if ubuntu?
