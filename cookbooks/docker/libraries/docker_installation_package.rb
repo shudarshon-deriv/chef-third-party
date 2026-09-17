@@ -154,6 +154,11 @@ module DockerCookbook
               recursive true
             end
 
+            execute 'dearmor-docker-key' do
+              command 'gpg --batch --yes --dearmor -o /etc/apt/keyrings/docker.gpg /etc/apt/keyrings/docker.asc'
+              action :nothing
+            end
+
             remote_file '/etc/apt/keyrings/docker.asc' do
               source "https://download.docker.com/linux/#{node['platform']}/gpg"
               owner 'root'
@@ -161,11 +166,9 @@ module DockerCookbook
               mode '0644'
               retries 3
               retry_delay 5
-            end
-
-            execute 'dearmor-docker-key' do
-              command 'gpg --batch --yes --dearmor -o /etc/apt/keyrings/docker.gpg /etc/apt/keyrings/docker.asc'
-              creates '/etc/apt/keyrings/docker.gpg'
+              # Re-dearmor whenever the upstream key changes (key rotation), so the
+              # keyring never goes stale. A `creates` guard would skip regeneration.
+              notifies :run, 'execute[dearmor-docker-key]', :immediately
             end
 
             codename = node['lsb']['codename']
